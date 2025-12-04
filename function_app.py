@@ -291,18 +291,31 @@ def HubspotAdd(req: func.HttpRequest) -> func.HttpResponse:
         elif r.status_code == 409:
             email = user["Email"]
             update_url = f"https://api.hubapi.com/crm/v3/objects/contacts/{email}?idProperty=email"
-            logger.info("Contact exists, attempting update...")
-            r = requests.patch(update_url, headers=headers, json=hubspot_data, timeout=30)
-            logger.info(f"HubSpot PATCH status: {r.status_code}")
-            logger.info(f"HubSpot PATCH response: {r.text}")
+            
+            logger.info("Contact already exists (409). Preparing to update contact...")
+            logger.info(f"PATCH URL: {update_url}")
+            logger.info(f"Payload for update: {json.dumps(hubspot_data)}")
+
+            try:
+                r = requests.patch(update_url, headers=headers, json=hubspot_data, timeout=30)
+                logger.info(f"HubSpot PATCH status: {r.status_code}")
+                logger.info(f"HubSpot PATCH response: {r.text}")
+            except Exception as patch_err:
+                logger.error(f"PATCH request failed: {patch_err}")
+                return func.HttpResponse(
+                    json.dumps({"message": "PATCH update failed", "error": str(patch_err)}),
+                    status_code=500,
+                    mimetype="application/json",
+                    headers={"Access-Control-Allow-Origin": "*"}
+                )
             if r.status_code == 400:
-                logger.error("HubSpot error 400")
+                logger.error("HubSpot PATCH returned error 400")
                 return func.HttpResponse(
                     json.dumps({"message": r.text}),
                     status_code=400,
                     mimetype="application/json",
                     headers={"Access-Control-Allow-Origin": "*"}
-                )
+            )
         else:
             contact_created = True  # New contact was created
 
